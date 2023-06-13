@@ -1,135 +1,182 @@
-let cardArray = [ 
-{ name: "fries", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/fries_t5rfhy.png", }, 
-{ name: "fries", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/fries_t5rfhy.png", },
-{ name: "pizza", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/pizza_bmge3a.png", },
-{ name: "pizza", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/pizza_bmge3a.png", }, 
-{ name: "milkshake", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/milkshake_emts11.png", },
-{ name: "milkshake", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/milkshake_emts11.png", }, 
-{ name: "ice-cream", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/ice-cream_olhaql.png", },
-{ name: "ice-cream", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/ice-cream_olhaql.png", },
-{ name: "hotdog", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/hotdog_ng2hna.png", },
-{ name: "hotdog", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/hotdog_ng2hna.png", },
-{ name: "cheeseburger", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/cheeseburger_ju7b3t.png", },
-{ name: "cheeseburger", img: "https://res.cloudinary.com/fakod29/image/upload/v1604561421/cheeseburger_ju7b3t.png", }, 
-]; 
+const moves = document.getElementById("moves-count");
+const timeValue = document.getElementById("time");
+const startButton = document.getElementById("start");
+const stopButton = document.getElementById("stop");
+const gameContainer = document.querySelector(".game-container");
+const result = document.getElementById("result");
+const controls = document.querySelector(".controls-container");
+let cards;
+let interval;
+let firstCard = false;
+let secondCard = false;
 
-//define variables and get DOM element
+//Items array
+const items = [
+  { name: "bee", image: "bee.png" },
+  { name: "crocodile", image: "crocodile.png" },
+  { name: "macaw", image: "macaw.png" },
+  { name: "gorilla", image: "gorilla.png" },
+  { name: "tiger", image: "tiger.png" },
+  { name: "monkey", image: "monkey.png" },
+  { name: "chameleon", image: "chameleon.png" },
+  { name: "piranha", image: "piranha.png" },
+  { name: "anaconda", image: "anaconda.png" },
+  { name: "sloth", image: "sloth.png" },
+  { name: "cockatoo", image: "cockatoo.png" },
+  { name: "toucan", image: "toucan.png" },
+];
 
-let grid = document.querySelector(".grid");
-let audio = document.querySelector("audio")
-let source = document.querySelector("#source")
-let scoreBoard = document.querySelector(".scoreBoard"); 
-let popup = document.querySelector(".popup"); 
-let playAgain = document.querySelector(".playAgain"); 
-let clickBoard = document.querySelector(".clickBoard"); 
-let imgs; 
-let cardsId = []; 
-let cardsSelected = []; 
-let cardsWon = 0; 
-let clicks = 0;
-document.addEventListener("DOMContentLoaded", function () {
-//define functions 
+//Initial Time
+let seconds = 0,
+  minutes = 0;
+//Initial moves and win count
+let movesCount = 0,
+  winCount = 0;
 
-createBoard(grid, cardArray); 
-arrangeCard();
-playAgain.addEventListener("click", replay); 
+//For timer
+const timeGenerator = () => {
+  seconds += 1;
+  //minutes logic
+  if (seconds >= 60) {
+    minutes += 1;
+    seconds = 0;
+  }
+  //format time before displaying
+  let secondsValue = seconds < 10 ? `0${seconds}` : seconds;
+  let minutesValue = minutes < 10 ? `0${minutes}` : minutes;
+  timeValue.innerHTML = `<span>Time:</span>${minutesValue}:${secondsValue}`;
+};
 
-//add a click functions for images 
+//For calculating moves
+const movesCounter = () => {
+  movesCount += 1;
+  moves.innerHTML = `<span>Moves:</span>${movesCount}`;
+};
 
-imgs = document.querySelectorAll("img");
-Array.from(imgs).forEach(img => 
-img.addEventListener("click", flipCard)
-) 
+//Pick random objects from the items array
+const generateRandom = (size = 4) => {
+  //temporary array
+  let tempArray = [...items];
+  //initializes cardValues array
+  let cardValues = [];
+  //size should be double (4*4 matrix)/2 since pairs of objects would exist
+  size = (size * size) / 2;
+  //Random object selection
+  for (let i = 0; i < size; i++) {
+    const randomIndex = Math.floor(Math.random() * tempArray.length);
+    cardValues.push(tempArray[randomIndex]);
+    //once selected remove the object from temp array
+    tempArray.splice(randomIndex, 1);
+  }
+  return cardValues;
+};
+
+const matrixGenerator = (cardValues, size = 4) => {
+  gameContainer.innerHTML = "";
+  cardValues = [...cardValues, ...cardValues];
+  //simple shuffle
+  cardValues.sort(() => Math.random() - 0.5);
+  for (let i = 0; i < size * size; i++) {
+    /*
+        Create Cards
+        before => front side (contains question mark)
+        after => back side (contains actual image);
+        data-card-values is a custom attribute which stores the names of the cards to match later
+      */
+    gameContainer.innerHTML += `
+     <div class="card-container" data-card-value="${cardValues[i].name}">
+        <div class="card-before">?</div>
+        <div class="card-after">
+        <img src="${cardValues[i].image}" class="image"/></div>
+     </div>
+     `;
+  }
+  //Grid
+  gameContainer.style.gridTemplateColumns = `repeat(${size},auto)`;
+
+  //Cards
+  cards = document.querySelectorAll(".card-container");
+  cards.forEach((card) => {
+    card.addEventListener("click", () => {
+      //If selected card is not matched yet then only run (i.e already matched card when clicked would be ignored)
+      if (!card.classList.contains("matched")) {
+        //flip the cliked card
+        card.classList.add("flipped");
+        //if it is the firstcard (!firstCard since firstCard is initially false)
+        if (!firstCard) {
+          //so current card will become firstCard
+          firstCard = card;
+          //current cards value becomes firstCardValue
+          firstCardValue = card.getAttribute("data-card-value");
+        } else {
+          //increment moves since user selected second card
+          movesCounter();
+          //secondCard and value
+          secondCard = card;
+          let secondCardValue = card.getAttribute("data-card-value");
+          if (firstCardValue == secondCardValue) {
+            //if both cards match add matched class so these cards would beignored next time
+            firstCard.classList.add("matched");
+            secondCard.classList.add("matched");
+            //set firstCard to false since next card would be first now
+            firstCard = false;
+            //winCount increment as user found a correct match
+            winCount += 1;
+            //check if winCount ==half of cardValues
+            if (winCount == Math.floor(cardValues.length / 2)) {
+              result.innerHTML = `<h2>You Won</h2>
+            <h4>Moves: ${movesCount}</h4>`;
+              stopGame();
+            }
+          } else {
+            //if the cards dont match
+            //flip the cards back to normal
+            let [tempFirst, tempSecond] = [firstCard, secondCard];
+            firstCard = false;
+            secondCard = false;
+            let delay = setTimeout(() => {
+              tempFirst.classList.remove("flipped");
+              tempSecond.classList.remove("flipped");
+            }, 900);
+          }
+        }
+      }
+    });
+  });
+};
+
+//Start game
+startButton.addEventListener("click", () => {
+  movesCount = 0;
+  seconds = 0;
+  minutes = 0;
+  //controls amd buttons visibility
+  controls.classList.add("hide");
+  stopButton.classList.remove("hide");
+  startButton.classList.add("hide");
+  //Start timer
+  interval = setInterval(timeGenerator, 1000);
+  //initial moves
+  moves.innerHTML = `<span>Moves:</span> ${movesCount}`;
+  initializer();
 });
-//createBoard function
 
-function createBoard(grid, array) { 
-popup.style.display = "none"; 
-array.forEach((arr, index) => { 
-let img = document.createElement("img"); 
-img.setAttribute("src", "https://res.cloudinary.com/fakod29/image/upload/v1604561420/blank_d3g5ij.png");
-img.setAttribute("data-id", index); 
-grid.appendChild(img); 
-})
-}
+//Stop game
+stopButton.addEventListener(
+  "click",
+  (stopGame = () => {
+    controls.classList.remove("hide");
+    stopButton.classList.add("hide");
+    startButton.classList.remove("hide");
+    clearInterval(interval);
+  })
+);
 
-// arrangeCard function
-
-function arrangeCard() { 
-cardArray.sort(() => 0.5 - Math.random())
-}
-
-// flip Card function
-
-function flipCard() { 
-let selected = this.dataset.id;
-  let clicked =cardArray[selected].name
-cardsSelected.push(clicked); 
-  
-   source.src=`${clicked}.mp3`
-  audio.load()
-  audio.play()
-  //this is the second method to play a sound
-  
-//    let clicked =cardArray[selected].name
-// cardsSelected.push(clicked); 
-// let sound =new Audio(`./${clicked}.mp3`) 
-// function playSound(sound){
-// sound.play()
-// }
-// playSound(sound)
-  
-  
-cardsId.push(selected); 
-this.classList.add("flip"); 
-this.setAttribute("src", cardArray[selected].img); 
-if (cardsId.length === 2) { 
-setTimeout(checkForMatch, 500);
-} 
-}
-// checkForMatch function
-
-function checkForMatch() { 
-let imgs = document.querySelectorAll("img"); 
-let firstCard = cardsId[0];
-let secondCard = cardsId[1];
-if (cardsSelected[0] === cardsSelected[1] && firstCard !== secondCard) { 
-alert("you have found a match"); 
- // source.src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3/success.mp3"
-  //this below is used if you want to add sounds, you can comment it out if you dont want it
- 
-cardsWon += 1; 
-scoreBoard.innerHTML = cardsWon; 
-setTimeout(checkWon,500) 
-} else { 
-imgs[firstCard].setAttribute("src", "https://res.cloudinary.com/fakod29/image/upload/v1604561420/blank_d3g5ij.png");
-imgs[secondCard].setAttribute("src", "https://res.cloudinary.com/fakod29/image/upload/v1604561420/blank_d3g5ij.png"); alert("wrong, please try again"); 
-  source.src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3/error.mp3"
-  audio.load()
-  audio.play()
-  imgs[firstCard].classList.remove("flip"); imgs[secondCard].classList.remove("flip"); 
-} 
-cardsSelected = []; 
-cardsId = []; 
-clicks += 1; 
-clickBoard.innerHTML = clicks; 
-}
-
-function checkWon() {
-if (cardsWon == cardArray.length / 2) {
-alert("You won") 
-setTimeout(()=> popup.style.display = "flex" ,300); 
-}
-}
-// The replay function
-
-function replay() { 
-arrangeCard(); 
-grid.innerHTML = "";
-createBoard(grid, cardArray);
-cardsWon = 0;
-clicks = 0; 
-clickBoard.innerHTML = 0; 
-scoreBoard.innerHTML = 0; 
-popup.style.display = "none"; 
-}
+//Initialize values and func calls
+const initializer = () => {
+  result.innerText = "";
+  winCount = 0;
+  let cardValues = generateRandom();
+  console.log(cardValues);
+  matrixGenerator(cardValues);
+};
